@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App de Estacionamento</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+    <style>
+      body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f4f7f6;
+      }
+      .container {
+          width: 80%;
+          margin: auto;
+          padding: 20px;
+      }
+      h1 {
+          text-align: center;
+          color: #333;
+      }
+      form {
+          display: flex;
+          flex-direction: column;
+          margin: 20px 0;
+      }
+      input {
+          margin: 10px 0;
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+      }
+      button {
+          padding: 10px;
+          background-color: #28a745;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background-color 0.3s;
+      }
+      button:hover {
+          background-color: #218838;
+      }
+      .admin, .user {
+          display: none;
+      }
+
+      /* Estilos para a tabela */
+      table {
+          width: 100%;
+          margin-top: 20px;
+          border-collapse: collapse;
+          background-color: #fff;
+          border-radius: 8px;
+          overflow: hidden;
+      }
+      th, td {
+          padding: 12px;
+          text-align: left;
+          border-bottom: 1px solid #ddd;
+      }
+      th {
+          background-color: #007bff;
+          color: white;
+      }
+      tr:hover {
+          background-color: #f1f1f1;
+      }
+      tbody tr:nth-child(odd) {
+          background-color: #f9f9f9;
+      }
+      tbody tr:nth-child(even) {
+          background-color: #fff;
+      }
+      .no-entries {
+          text-align: center;
+          color: #888;
+          font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Aplicativo de Estacionamento</h1>
+      <div id="login">
+        <h2>Login</h2>
+        <form id="loginForm">
+          <input type="email" id="email" placeholder="Email" required />
+          <input type="password" id="password" placeholder="Senha" required />
+          <button type="submit">Entrar</button>
+        </form>
+      </div>
+
+      <div class="admin" id="adminPage">
+        <h2>Página do Administrador</h2>
+        <button id="createUser">Criar Usuário</button>
+        <button id="logoutButtonADM">Logout</button>
+
+        <h3>Configurações de Preço</h3>
+        <input
+          type="number"
+          id="primeiraHora"
+          placeholder="Valor da Primeira Hora"
+          required
+        />
+        <input
+          type="number"
+          id="demaisHoras"
+          placeholder="Valor das Demais Horas"
+          required
+        />
+        <button id="salvarValores">Salvar Valores</button>
+      </div>
+
+      <div class="user" id="userPage">
+        <p id="welcomeMessage">Bem-vindo, <span id="userName">Usuário</span></p>
+        <h2>Página do Usuário</h2>
+        <h3>Entrada de Carro</h3>
+        <button id="logoutButton">Logout</button>
+        <form id="entradaForm">
+          <input
+            type="text"
+            id="modelo"
+            placeholder="Modelo do Carro"
+            required
+          />
+          <input type="text" id="placa" placeholder="Placa do Carro" required />
+          <button type="submit" id="registrarEntradaButton">
+            Registrar Entrada
+          </button>
+        </form>
+
+        <div>
+            <label for="ticketSearch">Pesquisar pelo Ticket:</label>
+            <input type="text" id="searchButton" placeholder="Digite o código do ticket">
+
+          </div>
+          
+
+        <!-- Tabela de Entradas -->
+        <h3>Entradas Registradas</h3>
+        <table id="entradasTable">
+          <thead>
+            <tr>
+              <th>Modelo</th>
+              <th>Placa</th>
+              <th>Data de Entrada</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- As entradas serão inseridas aqui via JavaScript -->
+          </tbody>
+        </table>
+        <p class="no-entries">Nenhuma entrada registrada ainda.</p>
+        <div id="ticketSection" style="display: none;">
+          <h3>Ticket Registrado</h3>
+          <p><strong>Modelo:</strong> <span id="ticketModelo"></span></p>
+          <p><strong>Placa:</strong> <span id="ticketPlaca"></span></p>
+          <p>
+            <strong>Hora de Entrada:</strong> <span id="ticketEntrada"></span>
+          </p>
+          <p>
+            <strong>Código do Ticket:</strong> <span id="ticketCodigo"></span>
+          </p>
+
+          <!-- Área onde o código de barras será exibido -->
+          <svg id="ticketBarcode"></svg>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+              import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+              import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+              import { getFirestore, doc, getDoc, collection, getDocs, setDoc, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+              import { setPersistence, browserLocalPersistence, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+              import { signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+              import { onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+              import { createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
+
+              const firebaseConfig = {
+                  apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
+                  authDomain: "park-system-bfc53.firebaseapp.com",
+                  projectId: "park-system-bfc53",
+                  storageBucket: "park-system-bfc53.firebasestorage.app",
+                  messagingSenderId: "431598769142",
+                  appId: "1:431598769142:web:825aed509188f8156e6dd7"
+              };
+
+              const app = initializeApp(firebaseConfig);
+              const auth = getAuth(app);
+              const db = getFirestore(app); // Inicializando o Firestore
+
+
+              document.getElementById('loginForm').addEventListener('submit', function(e) {
+                  e.preventDefault();
+
+                  const email = document.getElementById('email').value;
+                  const password = document.getElementById('password').value;
+
+                  // Fazendo login com o Firebase Authentication
+                  signInWithEmailAndPassword(auth, email, password)
+                      .then(async (userCredential) => {
+                          const user = userCredential.user;
+                          console.log("Usuário logado com sucesso:", user);
+
+                          // Verificando se o usuário é um administrador
+                          const docAdminRef = doc(db, "admins", user.uid);
+                          const docAdminSnap = await getDoc(docAdminRef);
+
+                          if (docAdminSnap.exists()) {
+                              if (docAdminSnap.data().isAdmin === true) {
+                                  document.getElementById('adminPage').style.display = 'block';
+                                  document.getElementById('userPage').style.display = 'none';
+                                  loadValores(); // Carregar os valores atuais
+                              } else {
+                                  document.getElementById('userPage').style.display = 'block';
+                                  document.getElementById('adminPage').style.display = 'none';
+                              }
+                          } else {
+                              document.getElementById('userPage').style.display = 'block';
+                              document.getElementById('adminPage').style.display = 'none';
+                          }
+
+                          // Esconde a tela de login
+                          document.getElementById('login').style.display = 'none';
+                      })
+                      .catch((error) => {
+                          console.error("Erro ao fazer login:", error.message);
+                          alert("Erro ao fazer login: Credenciais inválidas");
+                      });
+              });
+
+              // Função para carregar os valores existentes
+              async function loadValores() {
+                  const primeiraHoraRef = doc(db, "Valores", "primeiraHora");
+                  const demaisHorasRef = doc(db, "Valores", "demaisHoras");
+
+                  try {
+                      const primeiraHoraSnap = await getDoc(primeiraHoraRef);
+                      const demaisHorasSnap = await getDoc(demaisHorasRef);
+
+                      if (primeiraHoraSnap.exists()) {
+                          document.getElementById('primeiraHora').value = primeiraHoraSnap.data().valor;
+                      }
+
+                      if (demaisHorasSnap.exists()) {
+                          document.getElementById('demaisHoras').value = demaisHorasSnap.data().valor;
+                      }
+                  } catch (error) {
+                      console.error("Erro ao carregar os valores:", error);
+                  }
+              }
+
+              document.getElementById('salvarValores').addEventListener('click', async function() {
+                  const primeiraHora = parseFloat(document.getElementById('primeiraHora').value);
+        const demaisHoras = parseFloat(document.getElementById('demaisHoras').value);
+
+        if (primeiraHora <= 0 || demaisHoras <= 0) {
+          alert("Os valores devem ser maiores que zero.");
+          return;
+        }
+
+        if (primeiraHora <= demaisHoras) {
+          alert("O valor da primeira hora deve ser maior que o valor das demais horas.");
+          return;
+        }
+
+        try {
+          // Salvar os valores no Firestore
+          await setDoc(doc(db, "Valores", "primeiraHora"), { valor: primeiraHora });
+          await setDoc(doc(db, "Valores", "demaisHoras"), { valor: demaisHoras });
+          alert("Valores salvos com sucesso!");
+        } catch (error) {
+          console.error("Erro ao salvar os valores:", error);
+          alert("Erro ao salvar os valores.");
+        }
+      });
+
+      document.getElementById('entradaForm').addEventListener('submit', async function(e) {
+          e.preventDefault();
+
+    const modelo = document.getElementById('modelo').value;
+    const placa = document.getElementById('placa').value;
+    const horaEntrada = new Date().toLocaleTimeString();  // Hora de entrada
+    
+    // Gerar o código do ticket (pode ser um código aleatório)
+    const codigoTicket = 'TICKET-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    
+    // Criar o ticket no HTML
+    document.getElementById('ticketModelo').textContent = modelo;
+    document.getElementById('ticketPlaca').textContent = placa;
+    document.getElementById('ticketEntrada').textContent = horaEntrada;
+    document.getElementById('ticketCodigo').textContent = codigoTicket;
+    
+    // Gerar o código de barras com JsBarcode
+    JsBarcode('#ticketBarcode', codigoTicket);
+
+    // Criar o ticket no Firestore com o código do ticket como ID
+    const ticketRef = doc(db, "entradas", codigoTicket);  // Usando o código do ticket como o ID do documento
+    try {
+        await setDoc(ticketRef, {
+            modelo: modelo,
+            placa: placa,
+            entrada: new Date().getTime(),  // Hora de entrada no formato ISO
+            codigoTicket: codigoTicket  // Código único do ticket
+        });
+
+        console.log("Ticket registrado com sucesso no Firestore!");
+
+        document.getElementById('ticketSection').style.display = 'block'
+
+        // Criar uma janela de impressão
+    const printWindow = window.open('', '', 'height=800,width=800');
+    
+    // Escrever o conteúdo do ticket na janela de impressão
+    printWindow.document.write('<html><head><title>Ticket</title></head><body>');
+    printWindow.document.write('<h3>Ticket Registrado</h3>');
+    printWindow.document.write('<p><strong>Modelo:</strong> ' + document.getElementById('ticketModelo').textContent + '</p>');
+    printWindow.document.write('<p><strong>Placa:</strong> ' + document.getElementById('ticketPlaca').textContent + '</p>');
+    printWindow.document.write('<p><strong>Hora de Entrada:</strong> ' + document.getElementById('ticketEntrada').textContent + '</p>');
+    printWindow.document.write('<p><strong>Código do Ticket:</strong> ' + document.getElementById('ticketCodigo').textContent + '</p>');
+
+    
+    // Adicionando o código de barras na impressão
+    printWindow.document.write('<svg id="ticketBarcode"></svg>');
+    
+    // Fechar as tags do HTML
+    printWindow.document.write('</body></html>');
+    
+    // Espera a página carregar, gera o código de barras e chama a impressão
+    printWindow.document.close();
+
+    // Atraso de 500ms para garantir que o código de barras seja renderizado
+    setTimeout(function() {
+        // Gerar o código de barras na nova janela
+        JsBarcode(printWindow.document.getElementById('ticketBarcode'), document.getElementById('ticketCodigo').textContent, {
+            format: "CODE128",
+            displayValue: true,
+            fontSize: 18
+        });
+        
+        // Imprimir o ticket após o código de barras ser gerado
+        printWindow.print();
+    }, 500); // Atraso de 500ms
+
+    } catch (error) {
+        console.error("Erro ao registrar o ticket no Firestore:", error);
+        alert("Erro ao registrar o ticket.");
+    }
+});
+
+      function generateTicketCode() {
+          // Gerando um código aleatório, pode ser um número aleatório ou qualquer outro formato
+          return Math.random().toString(36).substr(2, 9); // Gera um código alfanumérico aleatório de 9 caracteres
+      }
+
+      function generateTicket(modelo, placa, entradaTimestamp, codigoTicket) {
+          const entradaDate = new Date(entradaTimestamp);
+          const formattedDate = entradaDate.toLocaleString(); // Formatar a hora de entrada
+
+          // Exibindo as informações do ticket
+          document.getElementById('ticketModelo').textContent = modelo;
+          document.getElementById('ticketPlaca').textContent = placa;
+          document.getElementById('ticketEntrada').textContent = formattedDate;
+          document.getElementById('ticketCodigo').textContent = codigoTicket;
+
+          // Gerando o código de barras (utilizando a biblioteca JsBarcode)
+          JsBarcode("#ticketBarcode", codigoTicket, {
+              format: "CODE128", // Formato do código de barras
+              displayValue: true, // Mostrar o valor ao lado do código de barras
+              fontSize: 18, // Tamanho da fonte
+          });
+      }
+
+
+              document.addEventListener('DOMContentLoaded', async function() {
+          try {
+              // Buscando os valores de preço do Firestore (correção: coleção 'Valores')
+              const valoresRef = collection(db, "Valores");  // Referência à coleção "Valores"
+              const querySnapshotValores = await getDocs(valoresRef);
+
+              let primeiraHora = 0;
+              let demaisHoras = 0;
+
+              // Verificando se os documentos "primeiraHora" e "demaisHoras" existem e atribuindo os valores
+              querySnapshotValores.forEach(doc => {
+                  const data = doc.data();
+
+                  if (doc.id === 'primeiraHora' && !isNaN(data.valor)) {
+                      primeiraHora = parseFloat(data.valor);  // Atribui o valor da primeira hora
+                  }
+
+                  if (doc.id === 'demaisHoras' && !isNaN(data.valor)) {
+                      demaisHoras = parseFloat(data.valor);  // Atribui o valor das demais horas
+                  }
+              });
+
+              // Verifica se ambos os valores foram encontrados e são válidos
+              if (primeiraHora === 0 || demaisHoras === 0) {
+                  console.error("Valores de preço inválidos no Firestore.");
+                  alert("Erro: Valores de preço não encontrados ou inválidos.");
+                  return;
+              }
+
+              // Buscando as entradas do Firestore
+              const entradasRef = collection(db, "entradas");  // Referência à coleção "entradas"
+              const querySnapshot = await getDocs(entradasRef);
+
+              const tableBody = document.querySelector("#entradasTable tbody");
+              const noEntriesMessage = document.querySelector(".no-entries");
+
+              // Limpando a tabela antes de adicionar novos dados
+              tableBody.innerHTML = '';
+
+              // Verificando se existem entradas
+              if (querySnapshot.empty) {
+                  noEntriesMessage.style.display = 'block';
+                  return;
+              } else {
+                  noEntriesMessage.style.display = 'none';
+              }
+
+              // Iterando sobre cada documento retornado
+              querySnapshot.forEach((docSnapshot) => {
+                  const data = docSnapshot.data();
+                  const modelo = data.modelo;
+                  const placa = data.placa;
+                  const entradaTimestamp = data.entrada;
+                  const entradaDate = new Date(entradaTimestamp);  // Convertendo para formato de data
+                  const formattedDate = entradaDate.toLocaleString();  // Formatação da data
+
+                  // Criando uma nova linha na tabela
+                  const row = document.createElement("tr");
+
+                  // Criando as células da tabela
+                  const modeloCell = document.createElement("td");
+                  modeloCell.textContent = modelo;
+                  row.appendChild(modeloCell);
+
+                  const placaCell = document.createElement("td");
+                  placaCell.textContent = placa;
+                  row.appendChild(placaCell);
+
+                  const dataEntradaCell = document.createElement("td");
+                  dataEntradaCell.textContent = formattedDate;
+                  row.appendChild(dataEntradaCell);
+              });
+          } catch (error) {
+              console.error("Erro ao buscar entradas:", error);
+
+          }
+      });
+
+      document.getElementById('ticketSection').addEventListener('click', function() {
+    const ticketSection = document.getElementById('ticketSection');
+    
+    // Criar uma janela de impressão
+    const printWindow = window.open('', '', 'height=800,width=800');
+    
+    // Escrever o conteúdo do ticket na janela de impressão
+    printWindow.document.write('<html><head><title>Ticket</title></head><body>');
+    printWindow.document.write('<h3>Ticket Registrado</h3>');
+    printWindow.document.write('<p><strong>Modelo:</strong> ' + document.getElementById('ticketModelo').textContent + '</p>');
+    printWindow.document.write('<p><strong>Placa:</strong> ' + document.getElementById('ticketPlaca').textContent + '</p>');
+    printWindow.document.write('<p><strong>Hora de Entrada:</strong> ' + document.getElementById('ticketEntrada').textContent + '</p>');
+    printWindow.document.write('<p><strong>Código do Ticket:</strong> ' + document.getElementById('ticketCodigo').textContent + '</p>');
+
+    
+    // Adicionando o código de barras na impressão
+    printWindow.document.write('<svg id="ticketBarcode"></svg>');
+    
+    // Fechar as tags do HTML
+    printWindow.document.write('</body></html>');
+    
+    // Espera a página carregar, gera o código de barras e chama a impressão
+    printWindow.document.close();
+
+    // Atraso de 500ms para garantir que o código de barras seja renderizado
+    setTimeout(function() {
+        // Gerar o código de barras na nova janela
+        JsBarcode(printWindow.document.getElementById('ticketBarcode'), document.getElementById('ticketCodigo').textContent, {
+            format: "CODE128",
+            displayValue: true,
+            fontSize: 18
+        });
+        
+        // Imprimir o ticket após o código de barras ser gerado
+        printWindow.print();
+    }, 500); // Atraso de 500ms
+});
+
+    // Configurando a persistência para salvar o login no local storage
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("Persistência configurada: o usuário permanecerá logado após atualizar a página.");
+  })
+  .catch((error) => {
+    console.error("Erro ao configurar a persistência:", error);
+  });
+
+// Verifica se o usuário já está autenticado ao carregar a página
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    console.log("Usuário logado:", user);
+     // Acessando o nome do usuário do Firebase Authentication
+     const userName = user.displayName || 'Usuário';
+
+// Atualizando o texto do "Bem-vindo"
+document.getElementById('welcomeMessage').style.display = 'block';
+document.getElementById('userName').textContent = userName;
+
+    // Verifica se o usuário é administrador
+    const docAdminRef = doc(db, "admins", user.uid);
+    const docAdminSnap = await getDoc(docAdminRef);
+
+    if (docAdminSnap.exists() && docAdminSnap.data().isAdmin === true) {
+      document.getElementById('adminPage').style.display = 'block';
+      document.getElementById('userPage').style.display = 'none';
+      loadValores(); // Carrega os valores para o admin
+    } else {
+      document.getElementById('userPage').style.display = 'block';
+      document.getElementById('adminPage').style.display = 'none';
+    }
+
+    // Esconde o login
+    document.getElementById('login').style.display = 'none';
+  } else {
+    console.log("Nenhum usuário logado. Exibindo tela de login.");
+    document.getElementById('login').style.display = 'block';
+    document.getElementById('adminPage').style.display = 'none';
+    document.getElementById('userPage').style.display = 'none';
+  }
+});
+
+document.getElementById('logoutButton').addEventListener('click', () => {
+  signOut(auth)
+    .then(() => {
+      console.log("Usuário deslogado com sucesso.");
+      location.reload(); // Recarrega a página para exibir o login
+    })
+    .catch((error) => {
+      console.error("Erro ao deslogar:", error);
+    });
+});
+
+document.getElementById('logoutButtonADM').addEventListener('click', () => {
+  signOut(auth)
+    .then(() => {
+      console.log("Usuário deslogado com sucesso.");
+      location.reload(); // Recarrega a página para exibir o login
+    })
+    .catch((error) => {
+      console.error("Erro ao deslogar:", error);
+    });
+});
+
+// Listener para atualizações em tempo real
+function monitorEntradasEmTempoReal() {
+    const entradasRef = collection(db, "entradas");
+
+    onSnapshot(entradasRef, (snapshot) => {
+        const tableBody = document.querySelector("#entradasTable tbody");
+        const noEntriesMessage = document.querySelector(".no-entries");
+
+        // Limpando a tabela
+        tableBody.innerHTML = "";
+
+        // Verificando se existem entradas
+        if (snapshot.empty) {
+            noEntriesMessage.style.display = "block";
+            return;
+        } else {
+            noEntriesMessage.style.display = "none";
+        }
+
+        // Adicionando cada entrada à tabela
+        snapshot.forEach((docSnapshot) => {
+            const data = docSnapshot.data();
+            const modelo = data.modelo;
+            const placa = data.placa;
+            const entradaTimestamp = data.entrada;
+            const entradaDate = new Date(entradaTimestamp);
+            const formattedDate = entradaDate.toLocaleString();
+
+            // Criando uma nova linha na tabela
+            const row = document.createElement("tr");
+
+            // Criando as células da tabela
+            const modeloCell = document.createElement("td");
+            modeloCell.textContent = modelo;
+            row.appendChild(modeloCell);
+
+            const placaCell = document.createElement("td");
+            placaCell.textContent = placa;
+            row.appendChild(placaCell);
+
+            const dataEntradaCell = document.createElement("td");
+            dataEntradaCell.textContent = formattedDate;
+            row.appendChild(dataEntradaCell);
+
+            // Criando a célula para o botão de registrar saída
+            const actionCell = document.createElement("td");
+            const saidaButton = document.createElement("button");
+            saidaButton.textContent = "Registrar Saída";
+            saidaButton.style.backgroundColor = "#dc3545";
+            saidaButton.onclick = async function() {
+                      const saida = new Date();
+                      const saidaTimestamp = saida.getTime();
+
+                      try {
+                          // Calculando a diferença de tempo entre entrada e saída
+                          const diffInMillis = saidaTimestamp - entradaTimestamp; // Diferença em milissegundos
+                          const diffInMinutes = diffInMillis / (1000 * 60); // Convertendo para minutos
+                          let roundedTime = Math.ceil(diffInMinutes / 15) * 15; // Arredonda para o múltiplo de 15 minutos mais próximo
+                          const finalHours = Math.floor(roundedTime / 60); // Converte minutos arredondados para horas finais
+
+                          // Verificando se o tempo é inferior a 15 minutos
+                          if (finalHours === 0) {
+                              alert("Tempo de estacionamento inferior a 15 minutos. Não será cobrado.");
+                              // Adicionando a saída na coleção "saidas" com a mesma estrutura da entrada
+                              const entradaDocRef = doc(db, "entradas", docSnapshot.id);  // Referência ao documento de entrada
+                              const saidaRef = doc(db, "saidas", docSnapshot.id)
+                              await setDoc(saidaRef, {
+                                  modelo: modelo,
+                                  placa: placa,
+                                  entrada: entradaTimestamp,  // Mantendo o campo de entrada
+                                  saida: saidaTimestamp,      // Registrando a hora de saída
+                                  valor: 0                    // Registrando como valor zero
+                              });
+
+                              // Removendo a entrada da coleção "entradas"
+                              const entradaRef = doc(db, "entradas", docSnapshot.id);  // Acessando pelo ID correto do documento
+                              await deleteDoc(entradaRef);  // Remover a entrada da coleção "entradas"
+
+                              alert("Saída registrada com sucesso!");
+                              document.getElementById('ticketSection').innerHTML = '';
+
+                              // Desabilitando o botão de saída e removendo a linha da tabela
+                              saidaButton.disabled = true;  // Desabilitando o botão após registrar a saída
+                              row.remove();  // Removendo a linha da tabela
+                              return; // Saindo da função sem continuar o cálculo do valor
+                          }
+
+                          let totalAmount = 0;
+
+                          if (finalHours === 1) {
+                              // Se o tempo for 1 hora
+                              totalAmount = primeiraHora;
+                          } else if (finalHours > 1) {
+                              // Se o tempo for maior que 1 hora
+                              totalAmount = ((finalHours - 1) * demaisHoras) + primeiraHora;
+                          }
+
+                          // Exibindo o valor final para o usuário
+                          console.log(`Total a ser cobrado: R$ ${totalAmount.toFixed(2)}`);  // Log para verificar o valor
+                          alert(`Tempo de estacionamento: ${finalHours} horas.\nValor a ser cobrado: R$ ${totalAmount.toFixed(2)}`);
+
+                          // Adicionando a saída na coleção "saidas" com a mesma estrutura da entrada
+                          const saidaRef = doc(db, "saidas", docSnapshot.id);  // Usando a placa como ID do documento
+                          await setDoc(saidaRef, {
+                              modelo: modelo,
+                              placa: placa,
+                              entrada: entradaTimestamp,  // Mantendo o campo de entrada
+                              saida: saidaTimestamp,      // Registrando a hora de saída
+                              valor: totalAmount,          // Registrando o valor a ser cobrado
+                          });
+
+                          // Removendo a entrada da coleção "entradas"
+                          const entradaRef = doc(db, "entradas", docSnapshot.id);  // Acessando pelo ID correto do documento
+                          await deleteDoc(entradaRef);  // Remover a entrada da coleção "entradas"
+
+                          alert("Saída registrada com sucesso!");
+                          document.getElementById('ticketSection').innerHTML = '';
+
+                          // Desabilitando o botão de saída e removendo a linha da tabela
+                          saidaButton.disabled = true;  // Desabilitando o botão após registrar a saída
+                          row.remove();  // Removendo a linha da tabela
+                      } catch (error) {
+                          console.error("Erro ao registrar saída:", error);
+                          alert("Erro ao registrar saída.");
+                      }
+                  };
+            actionCell.appendChild(saidaButton);
+            row.appendChild(actionCell);
+
+            // Adicionando a linha na tabela
+            tableBody.appendChild(row);
+        });
+    });
+}
+
+// Chamar o listener após carregar a página
+document.addEventListener("DOMContentLoaded", () => {
+    monitorEntradasEmTempoReal();
+});
+
+document.getElementById('searchButton').addEventListener('keyup', async function() {
+    const searchTerm = document.getElementById('searchButton').value.trim().toUpperCase();
+
+    try {
+        // Referência à coleção "entradas"
+        const entradasRef = collection(db, "entradas");
+        const querySnapshot = await getDocs(entradasRef);
+
+        const tableBody = document.querySelector("#entradasTable tbody");
+        const noEntriesMessage = document.querySelector(".no-entries");
+
+        // Limpando a tabela antes de adicionar novos dados
+        tableBody.innerHTML = '';
+
+        let found = false;
+
+        querySnapshot.forEach((docSnapshot) => {
+            const data = docSnapshot.data();
+            const modelo = data.modelo;
+            const placa = data.placa;
+            const entradaTimestamp = data.entrada;
+            const codigoTicket = data.codigoTicket; // código do ticket armazenado no Firestore
+            const entradaDate = new Date(entradaTimestamp);
+            const formattedDate = entradaDate.toLocaleString(); // Formatação da data
+
+            // Verificando se o código do ticket corresponde ao código de pesquisa
+            if (codigoTicket.toUpperCase().includes(searchTerm)) {
+                found = true;
+
+                // Criando uma nova linha na tabela
+                const row = document.createElement("tr");
+
+                // Criando as células da tabela
+                const modeloCell = document.createElement("td");
+                modeloCell.textContent = modelo;
+                row.appendChild(modeloCell);
+
+                const placaCell = document.createElement("td");
+                placaCell.textContent = placa;
+                row.appendChild(placaCell);
+
+                const dataEntradaCell = document.createElement("td");
+                dataEntradaCell.textContent = formattedDate;
+                row.appendChild(dataEntradaCell);
+
+                // Criando a célula para o botão de registrar saída
+                const actionCell = document.createElement("td");
+
+                const saidaButton = document.createElement("button");
+                saidaButton.textContent = "Registrar Saída";
+                saidaButton.style.backgroundColor = "#dc3545";
+                saidaButton.onclick = async function() {
+                      const saida = new Date();
+                      const saidaTimestamp = saida.getTime();
+
+                      try {
+                          // Calculando a diferença de tempo entre entrada e saída
+                          const diffInMillis = saidaTimestamp - entradaTimestamp; // Diferença em milissegundos
+                          const diffInMinutes = diffInMillis / (1000 * 60); // Convertendo para minutos
+                          let roundedTime = Math.ceil(diffInMinutes / 15) * 15; // Arredonda para o múltiplo de 15 minutos mais próximo
+                          const finalHours = Math.floor(roundedTime / 60); // Converte minutos arredondados para horas finais
+
+                          // Verificando se o tempo é inferior a 15 minutos
+                          if (finalHours === 0) {
+                              alert("Tempo de estacionamento inferior a 15 minutos. Não será cobrado.");
+                              // Adicionando a saída na coleção "saidas" com a mesma estrutura da entrada
+                              const entradaDocRef = doc(db, "entradas", docSnapshot.id);  // Referência ao documento de entrada
+                              const saidaRef = doc(db, "saidas", docSnapshot.id)
+                              await setDoc(saidaRef, {
+                                  modelo: modelo,
+                                  placa: placa,
+                                  entrada: entradaTimestamp,  // Mantendo o campo de entrada
+                                  saida: saidaTimestamp,      // Registrando a hora de saída
+                                  valor: 0                    // Registrando como valor zero
+                              });
+
+                              // Removendo a entrada da coleção "entradas"
+                              const entradaRef = doc(db, "entradas", docSnapshot.id);  // Acessando pelo ID correto do documento
+                              await deleteDoc(entradaRef);  // Remover a entrada da coleção "entradas"
+
+                              alert("Saída registrada com sucesso!");
+
+                              // Desabilitando o botão de saída e removendo a linha da tabela
+                              saidaButton.disabled = true;  // Desabilitando o botão após registrar a saída
+                              row.remove();  // Removendo a linha da tabela
+                              return; // Saindo da função sem continuar o cálculo do valor
+                          }
+
+                          let totalAmount = 0;
+
+                          if (finalHours === 1) {
+                              // Se o tempo for 1 hora
+                              totalAmount = primeiraHora;
+                          } else if (finalHours > 1) {
+                              // Se o tempo for maior que 1 hora
+                              totalAmount = ((finalHours - 1) * demaisHoras) + primeiraHora;
+                          }
+
+                          // Exibindo o valor final para o usuário
+                          console.log(`Total a ser cobrado: R$ ${totalAmount.toFixed(2)}`);  // Log para verificar o valor
+                          alert(`Tempo de estacionamento: ${finalHours} horas.\nValor a ser cobrado: R$ ${totalAmount.toFixed(2)}`);
+
+                          // Adicionando a saída na coleção "saidas" com a mesma estrutura da entrada
+                          const saidaRef = doc(db, "saidas", docSnapshot.id);  // Usando a placa como ID do documento
+                          await setDoc(saidaRef, {
+                              modelo: modelo,
+                              placa: placa,
+                              entrada: entradaTimestamp,  // Mantendo o campo de entrada
+                              saida: saidaTimestamp,      // Registrando a hora de saída
+                              valor: totalAmount,          // Registrando o valor a ser cobrado
+                          });
+
+                          // Removendo a entrada da coleção "entradas"
+                          const entradaRef = doc(db, "entradas", docSnapshot.id);  // Acessando pelo ID correto do documento
+                          await deleteDoc(entradaRef);  // Remover a entrada da coleção "entradas"
+
+                          alert("Saída registrada com sucesso!");
+
+                          // Desabilitando o botão de saída e removendo a linha da tabela
+                          saidaButton.disabled = true;  // Desabilitando o botão após registrar a saída
+                          row.remove();  // Removendo a linha da tabela
+                      } catch (error) {
+                          console.error("Erro ao registrar saída:", error);
+                          alert("Erro ao registrar saída.");
+                      }
+                  };
+
+                actionCell.appendChild(saidaButton);
+                row.appendChild(actionCell);
+
+                // Adicionando a linha na tabela
+                tableBody.appendChild(row);
+            }
+        });
+
+        // Exibe mensagem caso nenhum resultado seja encontrado
+        if (!found) {
+            noEntriesMessage.style.display = 'block';
+        } else {
+            noEntriesMessage.style.display = 'none';
+        }
+
+    } catch (error) {
+        console.error("Erro ao buscar entradas:", error);
+        alert("Erro ao realizar a pesquisa.");
+    }
+});
+
+async function registrarSaida(id, modelo, placa, entradaTimestamp) {
+    const saida = new Date();
+    const saidaTimestamp = saida.getTime();
+
+    try {
+        // Calculando a diferença de tempo entre entrada e saída
+        const diffInMillis = saidaTimestamp - entradaTimestamp;
+        const diffInMinutes = diffInMillis / (1000 * 60);
+        let roundedTime = Math.ceil(diffInMinutes / 15) * 15;
+        const finalHours = Math.floor(roundedTime / 60);
+
+        let totalAmount = 0;
+        if (finalHours === 1) {
+            totalAmount = primeiraHora;
+        } else if (finalHours > 1) {
+            totalAmount = ((finalHours - 1) * demaisHoras) + primeiraHora;
+        }
+
+        // Adicionando a saída na coleção "saidas"
+        const saidaRef = doc(db, "saidas", id);
+        await setDoc(saidaRef, {
+            modelo: modelo,
+            placa: placa,
+            entrada: entradaTimestamp,
+            saida: saidaTimestamp,
+            valor: totalAmount
+        });
+
+        // Removendo a entrada da coleção "entradas"
+        const entradaRef = doc(db, "entradas", id);
+        await deleteDoc(entradaRef);
+
+        alert("Saída registrada com sucesso!");
+    } catch (error) {
+        console.error("Erro ao registrar saída:", error);
+        alert("Erro ao registrar saída.");
+    }
+}
+
+// Função para criar um novo usuário
+document.getElementById('createUser').addEventListener('click', function() {
+  // Usando prompts para coletar os dados do usuário
+  const nome = prompt("Digite o nome do usuário:");
+  const email = prompt("Digite o email do usuário:");
+  const senha = prompt("Digite a senha do usuário:");
+
+  if (!nome || !email || !senha) {
+    alert("Todos os campos devem ser preenchidos!");
+    return;
+  }
+
+  // Criação do usuário no Firebase Authentication
+  createUserWithEmailAndPassword(auth, email, senha)
+    .then((userCredential) => {
+      const user = userCredential.user;
+
+      // Atualizar o nome do usuário
+      return updateProfile(user, {
+        displayName: nome
+      });
+    })
+    .then(() => {
+      // Agora vamos armazenar no Firestore (se necessário)
+      const db = getFirestore(app);
+      addDoc(collection(db, "usuarios"), {
+        uid: auth.currentUser.uid,
+        nome: nome,
+        email: email,
+        criadoEm: new Date()
+      }).then(() => {
+        alert('Usuário criado e armazenado no Firestore!');
+      }).catch((error) => {
+        console.error("Erro ao salvar no Firestore: ", error);
+      });
+
+      // Deslogar o usuário após a criação
+      signOut(auth).then(() => {
+        alert('Usuário criado com sucesso, mas está deslogado.');
+      }).catch((error) => {
+        console.log("Erro ao deslogar: ", error);
+      });
+
+    })
+    .catch((error) => {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      console.log(`Erro: ${errorCode} - ${errorMessage}`);
+      alert(`Erro ao criar o usuário: ${errorMessage}`);
+    });
+});
+
+    </script>
+
+  </body>
+</html>
