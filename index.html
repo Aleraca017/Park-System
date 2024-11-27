@@ -328,7 +328,7 @@ JsBarcode('#ticketBarcode', codigoTicketEAN13, {
             modelo: modelo,
             placa: placa,
             entrada: new Date().getTime(),  // Hora de entrada no formato ISO
-            codigoTicket: codigoTicket  // Código único do ticket
+            codigoTicket: codigoTicketEAN13 // Código único do ticket
         });
 
         console.log("Ticket registrado com sucesso no Firestore!");
@@ -741,7 +741,7 @@ document.getElementById('searchButton').addEventListener('keyup', async function
             const modelo = data.modelo;
             const placa = data.placa;
             const entradaTimestamp = data.entrada;
-            const codigoTicket = data.codigoTicket; // código do ticket armazenado no Firestore
+            const codigoTicketEAN13= data.codigoTicket; // código do ticket armazenado no Firestore
             const entradaDate = new Date(entradaTimestamp);
             const formattedDate = entradaDate.toLocaleString(); // Formatação da data
 
