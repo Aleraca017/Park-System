@@ -289,7 +289,7 @@
     const horaEntrada = new Date().toLocaleTimeString();  // Hora de entrada
     
     // Gerar o código do ticket (pode ser um código aleatório)
-    const codigoTicket = 'TICKET-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const codigoTicket = Math.random().toString(36).substring(2, 10).toUpperCase();
 
 // Criar o ticket no HTML
 document.getElementById('ticketModelo').textContent = modelo;
