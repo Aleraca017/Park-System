@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações do Sistema</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            font-size: 16px;
+            color: #333;
+        }
+
+        .form__field {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            background-color: #f9f9f9;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        #logoutButton {
+            background-color: #dc3545;
+        }
+
+        #logoutButton:hover {
+            background-color: #a71d2a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Configurações do Sistema</h1>
+        
+        <!-- Formulário de configuração -->
+        <div class="form-group">
+            <label for="primeiraHora">Valor da Primeira Hora (R$)</label>
+            <input type="number" class="form__field" id="primeiraHora" required />
+        </div>
+        
+        <div class="form-group">
+            <label for="demaisHoras">Valor das Demais Horas (R$)</label>
+            <input type="number" class="form__field" id="demaisHoras" required />
+        </div>
+
+        <div class="form-group">
+            <label for="diaria">Valor da Diária (R$)</label>
+            <input type="number" class="form__field" id="diaria" required />
+        </div>
+
+        <div class="form-group">
+            <label for="mensal">Valor Mensal (R$)</label>
+            <input type="number" class="form__field" id="mensal" required />
+        </div>
+
+        <button id="salvarValores">Salvar Configurações</button>
+        <button id="logoutButton">Voltar</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, setDoc, doc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
+            authDomain: "park-system-bfc53.firebaseapp.com",
+            projectId: "park-system-bfc53",
+            storageBucket: "park-system-bfc53.appspot.com",
+            messagingSenderId: "431598769142",
+            appId: "1:431598769142:web:825aed509188f8156e6dd7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Função para salvar os valores no Firestore
+        document.getElementById('salvarValores').addEventListener('click', async () => {
+            const primeiraHora = parseFloat(document.getElementById('primeiraHora').value);
+            const demaisHoras = parseFloat(document.getElementById('demaisHoras').value);
+            const diaria = parseFloat(document.getElementById('diaria').value);
+            const mensal = parseFloat(document.getElementById('mensal').value);
+
+            if (isNaN(primeiraHora) || isNaN(demaisHoras) || isNaN(diaria) || isNaN(mensal)) {
+                alert("Por favor, preencha todos os campos com valores válidos.");
+                return;
+            }
+
+            if (primeiraHora <= 0 || demaisHoras <= 0 || diaria <= 0 || mensal <= 0) {
+                alert("Os valores devem ser maiores que zero.");
+                return;
+            }
+
+            try {
+                // Salvar os valores no Firestore
+                await setDoc(doc(db, "Valores", "primeiraHora"), { valor: primeiraHora });
+                await setDoc(doc(db, "Valores", "demaisHoras"), { valor: demaisHoras });
+                await setDoc(doc(db, "Valores", "diaria"), { valor: diaria });
+                await setDoc(doc(db, "Valores", "mensal"), { valor: mensal });
+
+                alert("Configurações salvas com sucesso!");
+            } catch (error) {
+                console.error("Erro ao salvar as configurações:", error);
+                alert("Erro ao salvar as configurações.");
+            }
+        });
+
+        // Logout
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            history.back()
+        });
+    </script>
+</body>
+</html>

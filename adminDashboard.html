@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard do Administrador</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .menu {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .menu-item {
+            width: 100%;
+            text-align: center;
+            background-color: #007bff;
+            color: white;
+            padding: 20px;
+            margin: 10px 10px 10px 0px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+        }
+
+        .menu-item:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+
+        .menu-item a {
+            text-decoration: none;
+            color: white;
+            font-size: 18px;
+        }
+
+        button {
+            padding: 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        button:hover {
+            background-color: #a71d2a;
+        }
+
+        .configuracao, .relatorios{
+            
+        }
+
+        .configuracao p, .relatorios p{
+            padding-left: 15px;
+        }
+        
+        .logout{
+            width: 102%;
+            display: flex;
+            align-items: center;
+            justify-content: end;
+        }
+
+        .logout button{
+            width: 10%;
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        #ep-config-user{
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard do Administrador</h1>
+        
+        <div class="menu">
+            <div class="configuracao">
+                <p>Sistema</p>
+                <div class="menu-item" id="ep-config">
+                    <a href="config.html">Configurar Sistema</a>
+                </div>
+                <div class="menu-item" id="ep-config-user">
+                    <a href="config-user.html">Gerenciar Usuários</a>
+                </div>
+            </div>
+            <div class="relatorios"> <p>Relatórios</p>
+                <div class="menu-item" id="ep-relatorios">
+                    <a href="relatorios.html">Relatórios</a>
+                </div>
+                <div class="menu-item" id="ep-dashtr">
+                    <a href="dashboardRealTime.html">Dashboard em Tempo Real</a>
+                </div>
+                <div class="menu-item" id="ep-dashe">
+                    <a href="dashboardEstatica.html">Dashboard Estática</a>
+                </div>
+            </div>
+        </div>
+        <div class="logout">
+            <button id="logoutButton">Sair</button>
+        </div>
+       
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
+            authDomain: "park-system-bfc53.firebaseapp.com",
+            projectId: "park-system-bfc53",
+            storageBucket: "park-system-bfc53.appspot.com",
+            messagingSenderId: "431598769142",
+            appId: "1:431598769142:web:825aed509188f8156e6dd7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Verifica se o usuário é um administrador autenticado
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                try {
+                    const docRef = doc(db, "admins", user.uid);
+                    const docSnap = await getDoc(docRef);
+
+                    if (!docSnap.exists() || !docSnap.data().isAdmin) {
+                        alert("Acesso negado! Apenas administradores podem acessar esta página.");
+                        window.location.href = "admin.html";
+                    }
+                } catch (error) {
+                    console.error("Erro ao verificar permissões:", error);
+                    alert("Erro ao verificar permissões.");
+                    window.location.href = "admin.html";
+                }
+            } else {
+                window.location.href = "admin.html";
+            }
+        });
+
+        // Logout do administrador
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            signOut(auth)
+                .then(() => {
+                    alert("Deslogado com sucesso!");
+                    window.location.href = "admin.html";
+                })
+                .catch((error) => {
+                    console.error("Erro ao deslogar:", error);
+                    alert("Erro ao deslogar.");
+                });
+        });
+
+        document.getElementById('ep-config').addEventListener('click', function(){
+            window.location.href = 'config.html'
+        })
+
+        document.getElementById('ep-config-user').addEventListener('click', function(){
+            window.location.href = 'config-user.html'
+        })
+
+        document.getElementById('ep-relatorios').addEventListener('click', function(){
+            window.location.href = 'relatorios.html'
+        })
+
+        document.getElementById('ep-dashtr').addEventListener('click', function(){
+            window.location.href = 'dashboardRealTime.html'
+        })
+
+        document.getElementById('ep-dashe').addEventListener('click', function(){
+            window.location.href = 'dashboardEstatica.html'
+        })
+    </script>
+</body>
+</html>

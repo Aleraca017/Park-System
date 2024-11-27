@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login - Usuário</title>
+    <title>Login - Administrador</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -56,7 +56,7 @@
 </head>
 <body>
     <div id="login">
-        <h2>Login do Usuário</h2>
+        <h2>Login do Administrador</h2>
         <form id="loginForm">
             <input type="email" id="email" placeholder="Email" required />
             <input type="password" id="password" placeholder="Senha" required />
@@ -67,6 +67,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
         // Configuração do Firebase
         const firebaseConfig = {
@@ -80,20 +81,30 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            signInWithEmailAndPassword(auth, email, password)
-                .then(() => {
-                    window.location.href = "user.html"; // Redireciona para a página do usuário
-                })
-                .catch((error) => {
-                    alert("Erro ao fazer login: " + error.message);
-                });
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Verifica se o usuário é administrador
+                const docRef = doc(db, "admins", user.uid);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists() && docSnap.data().isAdmin) {
+                    window.location.href = "adminDashboard.html"; // Redireciona para a dashboard do admin
+                } else {
+                    alert("Acesso negado! Você não é administrador.");
+                }
+            } catch (error) {
+                alert("Erro ao fazer login: " + error.message);
+            }
         });
     </script>
 </body>

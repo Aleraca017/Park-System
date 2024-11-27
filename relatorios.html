@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 10px;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .no-entries {
+            text-align: center;
+            color: #888;
+            font-style: italic;
+        }
+
+        #logoutButton{
+            background-color: rgb(207, 52, 52);
+            &:hover{
+                background-color: rgb(134, 33, 33);
+            }
+        }
+
+        #exportarRelatorio{
+            background-color: #42baac;
+            &:hover{
+                background-color: #2b7970;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Relatórios de Entradas e Saídas</h1>
+
+        <!-- Botões para gerar relatórios -->
+        <button id="gerarRelatorioDiario">Relatório Diário</button>
+        <button id="gerarRelatorioMensal">Relatório Mensal</button>
+        <button id="gerarRelatorioAnual">Relatório Anual</button>
+        <hr>
+        <button id="exportarRelatorio">Exportar Relatório</button>
+        <button id="logoutButton">Voltar</button>
+
+        <!-- Tabela para exibir os dados -->
+        <table id="relatorioTable">
+            <thead>
+                <tr>
+                    <th>Modelo</th>
+                    <th>Placa</th>
+                    <th>Entrada</th>
+                    <th>Saída</th>
+                    <th>Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Relatório será preenchido aqui -->
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
+            authDomain: "park-system-bfc53.firebaseapp.com",
+            projectId: "park-system-bfc53",
+            storageBucket: "park-system-bfc53.appspot.com",
+            messagingSenderId: "431598769142",
+            appId: "1:431598769142:web:825aed509188f8156e6dd7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Verificar se o usuário está autenticado
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                // Se não estiver autenticado, redireciona para a página de login
+                window.location.href = "index.html";
+            }
+        });
+
+        // Função para carregar os relatórios
+        async function carregarRelatorio(filtro) {
+            const tableBody = document.querySelector("#relatorioTable tbody");
+            tableBody.innerHTML = ''; // Limpa a tabela antes de preencher com novos dados
+
+            let q;
+            const hoje = new Date();
+            const startOfDay = new Date(hoje.setHours(0, 0, 0, 0)).getTime();  // Conversão para timestamp
+            const endOfDay = new Date(hoje.setHours(23, 59, 59, 999)).getTime();  // Conversão para timestamp
+
+            if (filtro === 'diario') {
+                q = query(collection(db, "saidas"), where("saida", ">=", startOfDay), where("saida", "<=", endOfDay));
+            } else if (filtro === 'mensal') {
+                const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime();
+                const ultimoDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getTime();
+
+                q = query(collection(db, "saidas"), where("saida", ">=", primeiroDiaDoMes), where("saida", "<=", ultimoDiaDoMes));
+            } else if (filtro === 'anual') {
+                const primeiroDiaDoAno = new Date(hoje.getFullYear(), 0, 1).getTime();
+                const ultimoDiaDoAno = new Date(hoje.getFullYear(), 11, 31).getTime();
+
+                q = query(collection(db, "saidas"), where("saida", ">=", primeiroDiaDoAno), where("saida", "<=", ultimoDiaDoAno));
+            }
+
+            try {
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    const noEntriesRow = document.createElement("tr");
+                    noEntriesRow.classList.add("no-entries");
+                    noEntriesRow.innerHTML = `<td colspan="5">Nenhum registro encontrado para o período selecionado.</td>`;
+                    tableBody.appendChild(noEntriesRow);
+                    return;
+                }
+
+                querySnapshot.forEach((docSnapshot) => {
+                    const data = docSnapshot.data();
+                    const modelo = data.modelo || "Desconhecido";
+                    const placa = data.placa || "Desconhecida";
+                    const entrada = new Date(data.entrada).toLocaleString();  // Conversão do timestamp
+                    const saida = new Date(data.saida).toLocaleString();  // Conversão do timestamp
+                    const valor = data.valor || 0;
+
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${modelo}</td>
+                        <td>${placa}</td>
+                        <td>${entrada}</td>
+                        <td>${saida}</td>
+                        <td>${valor.toFixed(2)}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error("Erro ao carregar o relatório:", error);
+                alert("Erro ao carregar os dados do relatório.");
+            }
+        }
+
+        // Função para exportar os dados do relatório para CSV
+        function exportarRelatorio() {
+            const rows = Array.from(document.querySelectorAll("#relatorioTable tr"));
+            const csvContent = rows.map(row => {
+                return Array.from(row.cells).map(cell => cell.textContent).join(",");
+            }).join("\n");
+
+            const blob = new Blob([csvContent], { type: "text/csv" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "relatorio.csv";
+            link.click();
+        }
+
+        // Event listeners para gerar os relatórios
+        document.getElementById('gerarRelatorioDiario').addEventListener('click', () => {
+            carregarRelatorio('diario');
+        });
+
+        document.getElementById('gerarRelatorioMensal').addEventListener('click', () => {
+            carregarRelatorio('mensal');
+        });
+
+        document.getElementById('gerarRelatorioAnual').addEventListener('click', () => {
+            carregarRelatorio('anual');
+        });
+
+        document.getElementById('exportarRelatorio').addEventListener('click', exportarRelatorio);
+
+        // Logout
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            history.back()
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Estática</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .filter {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .filter label {
+            font-size: 1.2rem;
+        }
+
+        .filter input {
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .filter button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .filter button:hover {
+            background-color: #218838;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .totals {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 30px;
+        }
+
+        .totals .card {
+            background-color: #fff;
+            padding: 20px;
+            margin: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 30%;
+            text-align: center;
+        }
+
+        .totals .card h3 {
+            margin-bottom: 20px;
+        }
+
+        .totals .card p {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #logoutButton{
+            background-color: rgb(207, 52, 52);
+            &:hover{
+                background-color: rgb(134, 33, 33);
+            }
+        }
+
+        #exportarCsv{
+            background-color: #42baac;
+            &:hover{
+                background-color: #2b7970;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard Estática</h1>
+
+        <!-- Filtro de Data -->
+        <div class="filter">
+            <label for="dataSelecionada">Escolha a data: </label>
+            <input type="date" id="dataSelecionada">
+            <button id="filtrarData">Filtrar</button>
+            <button id="exportarCsv">Exportar para CSV</button>
+        </div>
+
+        <!-- Tabela de Carros (Entradas e Saídas) -->
+        <table id="tabelaCarros">
+            <thead>
+                <tr>
+                    <th>Modelo</th>
+                    <th>Placa</th>
+                    <th>Entrada</th>
+                    <th>Saída</th>
+                    <th>Valor</th> <!-- Valor agora é a última coluna -->
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Dados serão preenchidos aqui -->
+            </tbody>
+        </table>
+
+        <!-- Totais -->
+        <div class="totals">
+            <div class="card">
+                <h3>Total de Saídas</h3>
+                <p id="totalSaidas">0</p>
+            </div>
+            <div class="card">
+                <h3>Total de Valor Acumulado</h3>
+                <p id="totalValor">R$ 0,00</p>
+            </div>
+        </div>
+
+        <button id="logoutButton">Sair</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
+            authDomain: "park-system-bfc53.firebaseapp.com",
+            projectId: "park-system-bfc53",
+            storageBucket: "park-system-bfc53.appspot.com",
+            messagingSenderId: "431598769142",
+            appId: "1:431598769142:web:825aed509188f8156e6dd7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Definir o valor do input de data como o dia atual
+        const dataInput = document.getElementById('dataSelecionada');
+        const hoje = new Date();
+        const diaAtual = hoje.toISOString().split('T')[0];  // Formato YYYY-MM-DD
+        dataInput.value = diaAtual;
+
+        // Verificar se o usuário está autenticado
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                // Se não estiver autenticado, redireciona para a página de login
+                window.location.href = "index.html";
+            }
+        });
+
+        // Função para filtrar os dados por data selecionada
+        async function filtrarPorData() {
+            const dataSelecionada = document.getElementById('dataSelecionada').value;
+            if (!dataSelecionada) {
+                alert('Por favor, selecione uma data');
+                return;
+            }
+
+            // Converter a data selecionada para timestamp (início e fim do dia) em UTC
+            const dataInicio = new Date(dataSelecionada);
+
+            // Ajustando para UTC corretamente (usar data selecionada e ajustar para 00:00 UTC e 23:59 UTC)
+            const inicioDoDia = Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 0, 0, 0);
+            const fimDoDia = Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 23, 59, 59, 999);
+
+            // Consultar a coleção 'saidas' para a data selecionada
+            const saidasRef = collection(db, "saidas");
+
+            const saidasQuery = query(saidasRef, where("saida", ">=", inicioDoDia), where("saida", "<=", fimDoDia));
+
+            // Preencher tabela de carros
+            const saidasSnapshot = await getDocs(saidasQuery);
+
+            let totalEntradas = 0;
+            let totalSaidas = 0;
+            let totalValor = 0;
+
+            const tabelaCarros = document.getElementById('tabelaCarros').getElementsByTagName('tbody')[0];
+            tabelaCarros.innerHTML = ''; // Limpa a tabela antes de preencher
+
+            // Preenchendo a tabela com as entradas e saídas
+            saidasSnapshot.forEach((saidaDoc) => {
+                totalSaidas += 1;
+
+                const saidaData = saidaDoc.data();
+                const modelo = saidaData.modelo || "Desconhecido";
+                const placa = saidaData.placa || "Desconhecida";
+                const valor = saidaData.valor || 0;
+                const entrada = new Date(saidaData.entrada).toLocaleString();
+                const saida = new Date(saidaData.saida).toLocaleString();
+
+                const row = tabelaCarros.insertRow();
+                row.innerHTML = `
+                    <td>${modelo}</td>
+                    <td>${placa}</td>
+                    <td>${entrada}</td>
+                    <td>${saida}</td>
+                    <td>${valor.toFixed(2)}</td> <!-- Valor agora é a última coluna -->
+                `;
+                totalValor += valor;
+            });
+
+            // Atualizando os totais
+            document.getElementById('totalSaidas').textContent = totalSaidas;
+            document.getElementById('totalValor').textContent = `R$ ${totalValor.toFixed(2)}`;
+        }
+
+        // Função para exportar a tabela para CSV
+        function exportarParaCSV() {
+            const tabela = document.getElementById('tabelaCarros');
+            const linhas = Array.from(tabela.rows);
+            const csvArray = [];
+
+            // Cabeçalho
+            const cabecalho = Array.from(linhas[0].cells).map(cell => cell.textContent);
+            csvArray.push(cabecalho.join(','));
+
+            // Corpo da tabela
+            linhas.slice(1).forEach(linha => {
+                const dados = Array.from(linha.cells).map(cell => cell.textContent);
+                csvArray.push(dados.join(','));
+            });
+
+            // Criando o arquivo CSV
+            const csvContent = csvArray.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'relatorio.csv';
+            link.click();
+        }
+
+        // Evento do botão de filtrar
+        document.getElementById('filtrarData').addEventListener('click', filtrarPorData);
+
+        // Evento do botão de exportar para CSV
+        document.getElementById('exportarCsv').addEventListener('click', exportarParaCSV);
+
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            history.back()
+        });
+    </script>
+</body>
+</html>
