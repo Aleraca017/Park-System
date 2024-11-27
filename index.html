@@ -322,13 +322,13 @@ JsBarcode('#ticketBarcode', codigoTicketEAN13, {
 });
 
     // Criar o ticket no Firestore com o código do ticket como ID
-    const ticketRef = doc(db, "entradas", codigoTicket);  // Usando o código do ticket como o ID do documento
+    const ticketRef = doc(db, "entradas", codigoTicketEAN13);  // Usando o código do ticket como o ID do documento
     try {
         await setDoc(ticketRef, {
             modelo: modelo,
             placa: placa,
             entrada: new Date().getTime(),  // Hora de entrada no formato ISO
-            codigoTicket: codigoTicketEAN13 // Código único do ticket
+            codigoTicketEAN13: codigoTicketEAN13 // Código único do ticket
         });
 
         console.log("Ticket registrado com sucesso no Firestore!");
@@ -380,7 +380,7 @@ JsBarcode('#ticketBarcode', codigoTicketEAN13, {
           return Math.random().toString(36).substr(2, 9); // Gera um código alfanumérico aleatório de 9 caracteres
       }
 
-      function generateTicket(modelo, placa, entradaTimestamp, codigoTicket) {
+      function generateTicket(modelo, placa, entradaTimestamp, codigoTicketEAN13) {
           const entradaDate = new Date(entradaTimestamp);
           const formattedDate = entradaDate.toLocaleString(); // Formatar a hora de entrada
 
@@ -388,10 +388,10 @@ JsBarcode('#ticketBarcode', codigoTicketEAN13, {
           document.getElementById('ticketModelo').textContent = modelo;
           document.getElementById('ticketPlaca').textContent = placa;
           document.getElementById('ticketEntrada').textContent = formattedDate;
-          document.getElementById('ticketCodigo').textContent = codigoTicket;
+          document.getElementById('ticketCodigo').textContent = codigoTicketEAN13;
 
           // Gerando o código de barras (utilizando a biblioteca JsBarcode)
-          JsBarcode("#ticketBarcode", codigoTicket, {
+          JsBarcode("#ticketBarcode", codigoTicketEAN13, {
               format: "CODE128", // Formato do código de barras
               displayValue: true, // Mostrar o valor ao lado do código de barras
               fontSize: 18, // Tamanho da fonte
@@ -741,12 +741,12 @@ document.getElementById('searchButton').addEventListener('keyup', async function
             const modelo = data.modelo;
             const placa = data.placa;
             const entradaTimestamp = data.entrada;
-            const codigoTicketEAN13= data.codigoTicket; // código do ticket armazenado no Firestore
+            const codigoTicketEAN13= data.codigoTicketEAN13; // código do ticket armazenado no Firestore
             const entradaDate = new Date(entradaTimestamp);
             const formattedDate = entradaDate.toLocaleString(); // Formatação da data
 
             // Verificando se o código do ticket corresponde ao código de pesquisa
-            if (codigoTicket.toUpperCase().includes(searchTerm)) {
+            if (codigoTicketEAN13.toUpperCase().includes(searchTerm)) {
                 found = true;
 
                 // Criando uma nova linha na tabela
