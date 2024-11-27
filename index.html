@@ -290,15 +290,17 @@
     
     // Gerar o código do ticket (pode ser um código aleatório)
     const codigoTicket = 'TICKET-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    
-    // Criar o ticket no HTML
-    document.getElementById('ticketModelo').textContent = modelo;
-    document.getElementById('ticketPlaca').textContent = placa;
-    document.getElementById('ticketEntrada').textContent = horaEntrada;
-    document.getElementById('ticketCodigo').textContent = codigoTicket;
-    
-    // Gerar o código de barras com JsBarcode
-    JsBarcode('#ticketBarcode', codigoTicket);
+
+// Criar o ticket no HTML
+document.getElementById('ticketModelo').textContent = modelo;
+document.getElementById('ticketPlaca').textContent = placa;
+document.getElementById('ticketEntrada').textContent = horaEntrada;
+document.getElementById('ticketCodigo').textContent = codigoTicket;
+
+// Gerar o código de barras com JsBarcode (usando Code 128)
+JsBarcode('#ticketBarcode', codigoTicket, {
+  format: "CODE128"  // Definir o formato como Code 128
+});
 
     // Criar o ticket no Firestore com o código do ticket como ID
     const ticketRef = doc(db, "entradas", codigoTicket);  // Usando o código do ticket como o ID do documento
