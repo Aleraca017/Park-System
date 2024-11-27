@@ -288,8 +288,8 @@
     const placa = document.getElementById('placa').value;
     const horaEntrada = new Date().toLocaleTimeString();  // Hora de entrada
     
-    // Gerar o código do ticket (pode ser um código aleatório)
-    const codigoTicket = Math.random().toString(36).substring(2, 10).toUpperCase();
+    // Gerar o código do ticket (um número aleatório de 13 dígitos)
+const codigoTicket = Math.floor(Math.random() * 10000000000000).toString(); // 13 dígitos
 
 // Criar o ticket no HTML
 document.getElementById('ticketModelo').textContent = modelo;
@@ -297,7 +297,7 @@ document.getElementById('ticketPlaca').textContent = placa;
 document.getElementById('ticketEntrada').textContent = horaEntrada;
 document.getElementById('ticketCodigo').textContent = codigoTicket;
 
-// Gerar o código de barras com JsBarcode (usando Code 128)
+// Gerar o código de barras com JsBarcode (usando EAN13)
 JsBarcode('#ticketBarcode', codigoTicket, {
   format: "EAN13"
 });
