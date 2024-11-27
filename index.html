@@ -299,7 +299,7 @@ document.getElementById('ticketCodigo').textContent = codigoTicket;
 
 // Gerar o código de barras com JsBarcode (usando Code 128)
 JsBarcode('#ticketBarcode', codigoTicket, {
-  format: "CODE128"  // Definir o formato como Code 128
+  format: "EAN13"
 });
 
     // Criar o ticket no Firestore com o código do ticket como ID
