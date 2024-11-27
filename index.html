@@ -288,17 +288,36 @@
     const placa = document.getElementById('placa').value;
     const horaEntrada = new Date().toLocaleTimeString();  // Hora de entrada
     
-    // Gerar o código do ticket (um número aleatório de 13 dígitos)
-const codigoTicket = Math.floor(Math.random() * 10000000000000).toString(); // 13 dígitos
+    // Função para calcular o dígito de verificação EAN13
+function calcularDigitoVerificacaoEAN13(codigo) {
+  let soma = 0;
+  for (let i = 0; i < 12; i++) {
+    let num = parseInt(codigo.charAt(i));
+    // Posição ímpar: multiplicar por 3, posição par: multiplicar por 1
+    soma += (i % 2 === 0) ? num : num * 3;
+  }
+  const resto = soma % 10;
+  return resto === 0 ? 0 : 10 - resto;
+}
+
+// Gerar o código do ticket (12 dígitos aleatórios)
+let codigoTicket12 = Math.floor(Math.random() * 1000000000000).toString(); // 12 dígitos
+while (codigoTicket12.length < 12) {
+  codigoTicket12 = '0' + codigoTicket12; // Garantir que tenha exatamente 12 dígitos
+}
+
+// Calcular o dígito de verificação e adicionar ao código de barras
+const digitoVerificacao = calcularDigitoVerificacaoEAN13(codigoTicket12);
+const codigoTicketEAN13 = codigoTicket12 + digitoVerificacao; // Código completo com 13 dígitos
 
 // Criar o ticket no HTML
 document.getElementById('ticketModelo').textContent = modelo;
 document.getElementById('ticketPlaca').textContent = placa;
 document.getElementById('ticketEntrada').textContent = horaEntrada;
-document.getElementById('ticketCodigo').textContent = codigoTicket;
+document.getElementById('ticketCodigo').textContent = codigoTicketEAN13;
 
 // Gerar o código de barras com JsBarcode (usando EAN13)
-JsBarcode('#ticketBarcode', codigoTicket, {
+JsBarcode('#ticketBarcode', codigoTicketEAN13, {
   format: "EAN13"
 });
 
