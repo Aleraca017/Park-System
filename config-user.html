@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Novo Usuário</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .content {
+            text-align: center;
+            margin-top: 50px;
+        }
+        .input-field {
+            margin-bottom: 10px;
+            display: block;
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .input-field input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        #statusMessage {
+            margin-top: 20px;
+            font-size: 16px;
+        }
+        .error {
+            color: #721c24;
+            background-color: #f8d7da;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <h1>Criar Novo Usuário</h1>
+
+        <!-- Formulário para inserir e-mail, senha, nome de exibição e UID -->
+        <div class="input-field">
+            <input type="email" id="email" placeholder="Email do novo usuário" required>
+        </div>
+        <div class="input-field">
+            <input type="password" id="password" placeholder="Senha do novo usuário" required>
+        </div>
+        <div class="input-field">
+            <input type="text" id="displayName" placeholder="Nome de exibição" required>
+        </div>
+        <button class="btn" id="createUserBtn">Criar Novo Usuário</button>
+
+        <!-- Área de mensagens -->
+        <div id="statusMessage"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+        import { createUserWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
+            authDomain: "park-system-bfc53.firebaseapp.com",
+            projectId: "park-system-bfc53",
+            storageBucket: "park-system-bfc53.appspot.com",
+            messagingSenderId: "431598769142",
+            appId: "1:431598769142:web:825aed509188f8156e6dd7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Verificar se o usuário está autenticado (Administrador)
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                // Se não houver usuário logado, redireciona para admin.html
+                window.location.href = "admin.html";
+            } else {
+                // Verifica se o usuário logado é um administrador
+                checkIfAdmin(user);
+            }
+        });
+
+        // Função para verificar se o usuário é um administrador
+        async function checkIfAdmin(user) {
+            try {
+                // Acessa a coleção 'admins' no Firestore, verificando pelo uid
+                const docRef = doc(db, "admins", user.uid);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const userData = docSnap.data();
+                    if (userData.isAdmin) {
+                        console.log("Usuário é administrador.");
+                    } else {
+                        // Se não for administrador, redireciona para a página inicial
+                        window.location.href = "index.html"; // Ou a página que você escolher
+                    }
+                } else {
+                    console.log("Usuário não encontrado no Firestore.");
+                    window.location.href = "index.html"; // Redireciona caso o usuário não tenha perfil de administrador
+                }
+            } catch (error) {
+                console.error("Erro ao verificar o admin:", error);
+                window.location.href = "index.html"; // Em caso de erro, também redireciona para a página inicial
+            }
+        }
+
+        // Criar Novo Usuário
+        document.getElementById('createUserBtn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const displayName = document.getElementById('displayName').value;
+
+            if (!email || !password || !displayName) {
+                showMessage("Por favor, preencha todos os campos obrigatórios.", "error");
+                return;
+            }
+
+            try {
+                // Cria o novo usuário com e-mail e senha, mas não loga automaticamente
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Usar o e-mail como UID no Firestore
+                const uid = email;  // Usando o email como UID no Firestore
+
+                // Atualiza o perfil do usuário
+                await updateProfile(user, {
+                    displayName: displayName
+                });
+
+                // Armazenar o novo usuário no Firestore com o e-mail como UID
+                await setDoc(doc(db, "users", uid), {
+                    email: email,
+                    displayName: displayName,
+                    uid: uid
+                });
+
+                // Definindo o usuário como 'false' para isAdmin por padrão
+                await setDoc(doc(db, "admins", user.uid), {
+                    isAdmin: false // Defina como true se você quiser marcar o usuário como admin diretamente
+                });
+
+                // Desloga o novo usuário imediatamente após a criação para manter o administrador logado
+                await signOut(auth);  // Desloga o novo usuário, mantendo o admin logado
+
+                // Exibe a mensagem de sucesso
+                showMessage("Usuário criado com sucesso! O administrador continua logado.", "success");
+
+            } catch (error) {
+                showMessage("Erro ao criar usuário: " + error.message, "error");
+            } finally {
+                // Força a atualização da página após o processo
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);  // Atraso de 500ms para garantir que o processo seja concluído
+            }
+        });
+
+        // Função para exibir mensagens
+        function showMessage(message, type) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = message;
+            if (type === "error") {
+                statusMessage.className = "error";
+            } else if (type === "success") {
+                statusMessage.className = "success";
+            }
+        }
+    </script>
+</body>
+</html>

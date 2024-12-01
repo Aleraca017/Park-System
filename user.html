@@ -82,14 +82,6 @@
   <body>
     <div class="container">
       <h1>Aplicativo de Estacionamento</h1>
-      <div id="login" style="display: none">
-        <h2>Login</h2>
-        <form id="loginForm">
-          <input type="email" id="email" placeholder="Email" required />
-          <input type="password" id="password" placeholder="Senha" required />
-          <button type="submit">Entrar</button>
-        </form>
-      </div>
 
       <div class="user" id="userPage">
         <p id="welcomeMessage">Bem-vindo, <span id="userName">Usuário</span></p>
@@ -171,24 +163,6 @@
               const auth = getAuth(app);
               const db = getFirestore(app); // Inicializando o Firestore
 
-
-              document.getElementById('loginForm').addEventListener('submit', function(e) {
-                  e.preventDefault();
-
-                  const email = document.getElementById('email').value;
-                  const password = document.getElementById('password').value;
-
-                  // Fazendo login com o Firebase Authentication
-                  signInWithEmailAndPassword(auth, email, password)
-                      .then(async (userCredential) => {
-                          const user = userCredential.user;
-                          console.log("Usuário logado com sucesso:", user);
-                      })
-                      .catch((error) => {
-                          console.error("Erro ao fazer login:", error.message);
-                          alert("Erro ao fazer login: Credenciais inválidas");
-                      });
-              });
 
 
       document.getElementById('entradaForm').addEventListener('submit', async function(e) {
@@ -434,21 +408,28 @@ setPersistence(auth, browserLocalPersistence)
   });
 
 // Verifica se o usuário já está autenticado ao carregar a página
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    console.log("Usuário logado:", user);
-     // Acessando o nome do usuário do Firebase Authentication
-     const userName = user.displayName || 'Usuário';
-
-// Atualizando o texto do "Bem-vindo"
-document.getElementById('welcomeMessage').style.display = 'block';
-document.getElementById('userName').textContent = userName;
-
-  }
+onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        // Usuário não está logado, redirecionar para o login
+        window.location.href = "index.html";
+    } else {
+        console.log("Usuário autenticado:", user.email);
+        // Exibir o nome do usuário na página, se aplicável
+        const userName = user.displayName || "Usuário";
+        document.getElementById("userName").textContent = userName;
+    }
 });
 
 document.getElementById('logoutButton').addEventListener('click', () => {
-  history.back();
+    signOut(auth)
+        .then(() => {
+            // Redirecionar para a página de login após logout
+            window.location.href = "index.html";
+        })
+        .catch((error) => {
+            console.error("Erro ao deslogar:", error);
+            alert("Ocorreu um erro ao tentar deslogar. Tente novamente.");
+        });
 });
 
 // Listener para atualizações em tempo real
