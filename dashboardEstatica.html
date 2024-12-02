@@ -4,10 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Estática</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f7f6;
+            display: flex;
+            justify-content: space-between;
+            flex-direction: column;
+            align-items: center;
+            height: 100dvh;
             margin: 0;
             padding: 0;
         }
@@ -119,6 +126,8 @@
 
         #logoutButton{
             background-color: rgb(207, 52, 52);
+            width: 7dvw;
+            margin: 10px;
             &:hover{
                 background-color: rgb(134, 33, 33);
             }
@@ -130,19 +139,40 @@
                 background-color: #2b7970;
             }
         }
+
+        footer{
+            width: 100dvw;
+            text-align: end;
+            margin-right: .5dvw;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .header{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 15%;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="header">
         <h1>Dashboard Estática</h1>
-
         <!-- Filtro de Data -->
         <div class="filter">
             <label for="dataSelecionada">Escolha a data: </label>
             <input type="date" id="dataSelecionada">
+            <select id="tipoFiltro">
+                <option value="dia">Dia</option>
+                <option value="mes">Mês</option>
+                <option value="ano">Ano</option>
+            </select>
             <button id="filtrarData">Filtrar</button>
-            <button id="exportarCsv">Exportar para CSV</button>
         </div>
+    </div>
+    <div class="container">
 
         <!-- Tabela de Carros (Entradas e Saídas) -->
         <table id="tabelaCarros">
@@ -172,8 +202,18 @@
             </div>
         </div>
 
-        <button id="logoutButton">Sair</button>
+        
     </div>
+    <div class="charts">
+        <canvas id="graficoDiario"></canvas>
+        <canvas id="graficoMensal"></canvas>
+        <canvas id="graficoAnual"></canvas>
+    </div>
+    
+    <footer>
+        <button id="logoutButton">Sair</button>
+        <h3>Criado e desenvolvido por <a href="https://linktr.ee/017_us" target="_blank">Alexandre Miranda</a></h3>
+    </footer>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
@@ -208,98 +248,216 @@
             }
         });
 
+    document.getElementById('tipoFiltro').addEventListener('click', function(){
+        const tipoFiltro = document.getElementById('tipoFiltro').value;
+
+        if(tipoFiltro === 'dia'){
+            document.getElementById('dataSelecionada').type = 'date'
+        }else if(tipoFiltro === 'mes'){
+            document.getElementById('dataSelecionada').type = 'month'
+        }else if(tipoFiltro === 'ano'){
+            document.getElementById('dataSelecionada').type = 'number'
+            document.getElementById('dataSelecionada').min = '2024'
+            document.getElementById('dataSelecionada').step = '1'
+        }
+    })
+
         // Função para filtrar os dados por data selecionada
         async function filtrarPorData() {
-            const dataSelecionada = document.getElementById('dataSelecionada').value;
-            if (!dataSelecionada) {
-                alert('Por favor, selecione uma data');
-                return;
+    const dataSelecionada = document.getElementById('dataSelecionada').value;
+    const tipoFiltro = document.getElementById('tipoFiltro').value;
+
+    if (!dataSelecionada) {
+        alert('Por favor, selecione uma data');
+        return;
+    }
+
+    const dataInicio = new Date(dataSelecionada);
+    let inicioDoPeriodo, fimDoPeriodo;
+
+    // Determine o intervalo com base no tipo de filtro
+    if (tipoFiltro === 'dia') {
+        inicioDoPeriodo = new Date(Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 0, 0, 0));
+        fimDoPeriodo = new Date(Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 23, 59, 59, 999));
+    } else if (tipoFiltro === 'mes') {
+        inicioDoPeriodo = new Date(Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), 1, 0, 0, 0));
+        fimDoPeriodo = new Date(Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth() + 1, 0, 23, 59, 59, 999)); // Último dia do mês
+    } else if (tipoFiltro === 'ano') {
+        inicioDoPeriodo = new Date(Date.UTC(dataInicio.getUTCFullYear(), 0, 1, 0, 0, 0));
+        fimDoPeriodo = new Date(Date.UTC(dataInicio.getUTCFullYear(), 11, 31, 23, 59, 59, 999)); // Último dia do ano
+    }
+
+    // Consultar Firestore para o intervalo selecionado
+    const saidasRef = collection(db, "saidas");
+    const saidasQuery = query(saidasRef, where("saida", ">=", inicioDoPeriodo.getTime()), where("saida", "<=", fimDoPeriodo.getTime()));
+
+    // Consultar e exibir os dados
+    const saidasSnapshot = await getDocs(saidasQuery);
+
+    let totalSaidas = 0;
+    let totalValor = 0;
+
+    // Estruturas para os dados do gráfico
+    let labels = [];
+    let valores = [];
+
+    // Preenchendo a tabela e acumulando dados para o gráfico
+    const tabelaCarros = document.getElementById('tabelaCarros').getElementsByTagName('tbody')[0];
+    tabelaCarros.innerHTML = ''; // Limpa a tabela antes de preencher
+
+    saidasSnapshot.forEach((saidaDoc) => {
+        totalSaidas += 1;
+
+        const saidaData = saidaDoc.data();
+        const modelo = saidaData.modelo || "Desconhecido";
+        const placa = saidaData.placa || "Desconhecida";
+        const valor = saidaData.valor || 0;
+        const entrada = new Date(saidaData.entrada).toLocaleString();
+        const saida = new Date(saidaData.saida).toLocaleString();
+
+        // Adicionar dados na tabela
+        const row = tabelaCarros.insertRow();
+        row.innerHTML = `
+            <td>${modelo}</td>
+            <td>${placa}</td>
+            <td>${entrada}</td>
+            <td>${saida}</td>
+            <td>${valor.toFixed(2)}</td>
+        `;
+        totalValor += valor;
+
+        // Acumulando os dados para o gráfico
+        if (tipoFiltro === 'dia') {
+            const hora = new Date(saidaData.saida).getHours(); // Hora da saída
+            const horaFormatada = `${hora}:00`;
+            if (!labels.includes(horaFormatada)) {
+                labels.push(horaFormatada);
+                valores.push(valor);
+            } else {
+                const index = labels.indexOf(horaFormatada);
+                valores[index] += valor; // Soma os valores da mesma hora
             }
-
-            // Converter a data selecionada para timestamp (início e fim do dia) em UTC
-            const dataInicio = new Date(dataSelecionada);
-
-            // Ajustando para UTC corretamente (usar data selecionada e ajustar para 00:00 UTC e 23:59 UTC)
-            const inicioDoDia = Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 0, 0, 0);
-            const fimDoDia = Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 23, 59, 59, 999);
-
-            // Consultar a coleção 'saidas' para a data selecionada
-            const saidasRef = collection(db, "saidas");
-
-            const saidasQuery = query(saidasRef, where("saida", ">=", inicioDoDia), where("saida", "<=", fimDoDia));
-
-            // Preencher tabela de carros
-            const saidasSnapshot = await getDocs(saidasQuery);
-
-            let totalEntradas = 0;
-            let totalSaidas = 0;
-            let totalValor = 0;
-
-            const tabelaCarros = document.getElementById('tabelaCarros').getElementsByTagName('tbody')[0];
-            tabelaCarros.innerHTML = ''; // Limpa a tabela antes de preencher
-
-            // Preenchendo a tabela com as entradas e saídas
-            saidasSnapshot.forEach((saidaDoc) => {
-                totalSaidas += 1;
-
-                const saidaData = saidaDoc.data();
-                const modelo = saidaData.modelo || "Desconhecido";
-                const placa = saidaData.placa || "Desconhecida";
-                const valor = saidaData.valor || 0;
-                const entrada = new Date(saidaData.entrada).toLocaleString();
-                const saida = new Date(saidaData.saida).toLocaleString();
-
-                const row = tabelaCarros.insertRow();
-                row.innerHTML = `
-                    <td>${modelo}</td>
-                    <td>${placa}</td>
-                    <td>${entrada}</td>
-                    <td>${saida}</td>
-                    <td>${valor.toFixed(2)}</td> <!-- Valor agora é a última coluna -->
-                `;
-                totalValor += valor;
-            });
-
-            // Atualizando os totais
-            document.getElementById('totalSaidas').textContent = totalSaidas;
-            document.getElementById('totalValor').textContent = `R$ ${totalValor.toFixed(2)}`;
+        } else if (tipoFiltro === 'mes') {
+            const dia = new Date(saidaData.saida).getDate(); // Dia do mês
+            const diaFormatado = dia < 10 ? `0${dia}` : `${dia}`;
+            if (!labels.includes(diaFormatado)) {
+                labels.push(diaFormatado);
+                valores.push(valor);
+            } else {
+                const index = labels.indexOf(diaFormatado);
+                valores[index] += valor; // Soma os valores do mesmo dia
+            }
+        } else if (tipoFiltro === 'ano') {
+            const mes = new Date(saidaData.saida).toLocaleString('default', { month: 'long' }); // Nome do mês
+            if (!labels.includes(mes)) {
+                labels.push(mes);
+                valores.push(valor);
+            } else {
+                const index = labels.indexOf(mes);
+                valores[index] += valor; // Soma os valores do mesmo mês
+            }
         }
+    });
 
-        // Função para exportar a tabela para CSV
-        function exportarParaCSV() {
-            const tabela = document.getElementById('tabelaCarros');
-            const linhas = Array.from(tabela.rows);
-            const csvArray = [];
+    // Atualizando os totais na tela
+    document.getElementById('totalSaidas').textContent = totalSaidas;
+    document.getElementById('totalValor').textContent = `R$ ${totalValor.toFixed(2)}`;
 
-            // Cabeçalho
-            const cabecalho = Array.from(linhas[0].cells).map(cell => cell.textContent);
-            csvArray.push(cabecalho.join(','));
+    // Atualizando o gráfico com os dados acumulados
+    atualizarGrafico(tipoFiltro, labels, valores);
+}
 
-            // Corpo da tabela
-            linhas.slice(1).forEach(linha => {
-                const dados = Array.from(linha.cells).map(cell => cell.textContent);
-                csvArray.push(dados.join(','));
-            });
+function atualizarGrafico(tipoFiltro, labels, valores) {
+    const ctx = document.getElementById('graficoDiario').getContext('2d');
 
-            // Criando o arquivo CSV
-            const csvContent = csvArray.join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'relatorio.csv';
-            link.click();
+    // Verifique se já existe um gráfico e destrua-o antes de criar um novo
+    if (window.grafico) {
+        window.grafico.destroy();  // Destrói o gráfico anterior
+    }
+
+    // Criar um novo gráfico
+    window.grafico = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,  // Labels serão os dias, meses ou horas, dependendo do filtro
+            datasets: [{
+                label: `Total de Saídas (${tipoFiltro})`,
+                data: valores,
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
         }
+    });
+}
 
-        // Evento do botão de filtrar
-        document.getElementById('filtrarData').addEventListener('click', filtrarPorData);
 
-        // Evento do botão de exportar para CSV
-        document.getElementById('exportarCsv').addEventListener('click', exportarParaCSV);
+// Evento do botão de filtrar
+document.getElementById('filtrarData').addEventListener('click', async () => {
+    await filtrarPorData();
+});
+
+
 
         document.getElementById('logoutButton').addEventListener('click', () => {
             history.back()
         });
+
+
+function renderGraficoMensal(dados) {
+    const ctx = document.getElementById('graficoMensal').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dados.dias, // ["1", "2", "3", ..., "30"]
+            datasets: [{
+                label: 'Movimentação Mensal',
+                data: dados.valores, // Valores por dia
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+            }]
+        }
+    });
+}
+
+function renderGraficoAnual(dados) {
+    const ctx = document.getElementById('graficoAnual').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: dados.meses, // ["Janeiro", "Fevereiro", ...]
+            datasets: [{
+                label: 'Movimentação Anual',
+                data: dados.valores, // Valores por mês
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 159, 64, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        }
+    });
+}
     </script>
 </body>
 </html>

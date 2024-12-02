@@ -9,7 +9,8 @@
             font-family: Arial, sans-serif;
             background-color: #f4f7f6;
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
+            flex-direction: column;
             align-items: center;
             height: 100vh;
             margin: 0;
@@ -52,9 +53,33 @@
         button:hover {
             background-color: #0056b3;
         }
+
+        
+        .link {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .link a:hover {
+            text-decoration: underline;
+        }
+
+        footer{
+            width: 100dvw;
+            text-align: end;
+            margin-right: 3dvw;
+        }
     </style>
 </head>
 <body>
+    <div class="header">
+
+    </div>
     <div id="login">
         <h2>Login do Administrador</h2>
         <form id="loginForm">
@@ -62,11 +87,18 @@
             <input type="password" id="password" placeholder="Senha" required />
             <button type="submit">Entrar</button>
         </form>
+        
+        <div class="link">
+            <a href="#" id="forgotPasswordLink">Esqueceu sua senha?</a>
+        </div>
     </div>
+    <footer>
+        <h3>Criado e desenvolvido por <a href="https://linktr.ee/017_us" target="_blank">Alexandre Miranda</a></h3>
+    </footer>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
         // Configuração do Firebase
@@ -104,6 +136,23 @@
                 }
             } catch (error) {
                 alert("Erro ao fazer login: " + error.message);
+            }
+        });
+
+        
+        // Recuperação de senha
+        document.getElementById('forgotPasswordLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            const email = prompt("Digite seu e-mail para recuperação de senha:");
+
+            if (email) {
+                sendPasswordResetEmail(auth, email)
+                    .then(() => {
+                        alert("Um link de recuperação foi enviado para o seu e-mail.");
+                    })
+                    .catch((error) => {
+                        alert("Erro ao enviar o link de recuperação: " + error.message);
+                    });
             }
         });
     </script>

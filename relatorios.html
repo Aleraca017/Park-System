@@ -10,6 +10,11 @@
             background-color: #f4f7f6;
             margin: 0;
             padding: 0;
+            display: flex;
+            justify-content: space-between;
+            flex-direction: column;
+            align-items: center;
+            height: 100dvh;
         }
 
         .container {
@@ -81,11 +86,26 @@
                 background-color: #2b7970;
             }
         }
+
+        footer{
+            width: 100dvw;
+            text-align: end;
+            margin-right: 3dvw;
+        }
+
+        .header{
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            height: 15%;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="header">
         <h1>Relatórios de Entradas e Saídas</h1>
+    </div>
+    <div class="container">
 
         <!-- Botões para gerar relatórios -->
         <button id="gerarRelatorioDiario">Relatório Diário</button>
@@ -111,6 +131,9 @@
             </tbody>
         </table>
     </div>
+    <footer>
+        <h3>Criado e desenvolvido por <a href="https://linktr.ee/017_us" target="_blank">Alexandre Miranda</a></h3>
+    </footer>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";

@@ -7,7 +7,12 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f7f6;
+            background-color: #e7e7e7;
+            display: flex;
+            justify-content: space-between;
+            flex-direction: column;
+            align-items: center;
+            height: 100dvh;
             margin: 0;
             padding: 0;
         }
@@ -56,10 +61,6 @@
             background-color: #218838;
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
         #logoutButton {
             background-color: #dc3545;
         }
@@ -67,12 +68,29 @@
         #logoutButton:hover {
             background-color: #a71d2a;
         }
+
+        footer{
+            width: 100dvw;
+            text-align: end;
+            margin-right: 3dvw;
+        }
+
+        .header{
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            height: 15%;
+        }
     </style>
 </head>
+
+
 <body>
+    <div class="header">
+         <h1>Configurações do Sistema</h1>
+    </div>
+    
     <div class="container">
-        <h1>Configurações do Sistema</h1>
-        
         <!-- Formulário de configuração -->
         <div class="form-group">
             <label for="primeiraHora">Valor da Primeira Hora (R$)</label>
@@ -94,16 +112,31 @@
             <input type="number" class="form__field" id="mensal" required />
         </div>
 
+        <!-- Novo campo para tempo de tolerância -->
+        <div class="form-group">
+            <label for="tolerancia">Tempo de Tolerância (minutos)</label>
+            <input type="number" class="form__field" id="tolerancia" required />
+        </div>
+
+        <div class="form-group">
+            <label for="tolerancia">Meta Diaria</label>
+            <input type="number" class="form__field" id="metas" required />
+        </div>
+
         <button id="salvarValores">Salvar Configurações</button>
         <button id="logoutButton">Voltar</button>
     </div>
 
+    <footer>
+        <h3>Criado e desenvolvido por <a href="https://linktr.ee/017_us" target="_blank">Alexandre Miranda</a></h3>
+    </footer>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getFirestore, setDoc, doc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+        import { getFirestore, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
-        // Configuração do Firebase
+    
         const firebaseConfig = {
             apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
             authDomain: "park-system-bfc53.firebaseapp.com",
@@ -112,46 +145,90 @@
             messagingSenderId: "431598769142",
             appId: "1:431598769142:web:825aed509188f8156e6dd7"
         };
-
+    
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
+        const auth = getAuth(app)
 
+        onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        alert("Usuário não autenticado! Redirecionando para a página de login.");
+        window.location.href = "index.html"; // Altere para o caminho correto de sua página de login
+    }
+});
+    
+        // Função para carregar os valores do Firestore e preencher os campos
+        async function carregarValores() {
+            try {
+                const docRefs = {
+                    primeiraHora: doc(db, "Valores", "primeiraHora"),
+                    demaisHoras: doc(db, "Valores", "demaisHoras"),
+                    diaria: doc(db, "Valores", "diaria"),
+                    mensal: doc(db, "Valores", "mensal"),
+                    tolerancia: doc(db, "Valores", "tolerancia"),
+                    metas: doc(db, "Valores", "metas")
+                };
+    
+                for (const [campo, ref] of Object.entries(docRefs)) {
+                    const docSnap = await getDoc(ref);
+                    if (docSnap.exists()) {
+                        document.getElementById(campo).value = docSnap.data().valor;
+                    }
+                }
+            } catch (error) {
+                console.error("Erro ao carregar os valores:", error.message);
+                alert("Erro ao carregar as configurações. Tente novamente.");
+            }
+        }
+    
         // Função para salvar os valores no Firestore
         document.getElementById('salvarValores').addEventListener('click', async () => {
             const primeiraHora = parseFloat(document.getElementById('primeiraHora').value);
             const demaisHoras = parseFloat(document.getElementById('demaisHoras').value);
             const diaria = parseFloat(document.getElementById('diaria').value);
             const mensal = parseFloat(document.getElementById('mensal').value);
-
-            if (isNaN(primeiraHora) || isNaN(demaisHoras) || isNaN(diaria) || isNaN(mensal)) {
+            const tolerancia = parseInt(document.getElementById('tolerancia').value);
+            const meta = parseInt(document.getElementById('metas').value);
+    
+            // Validação dos campos
+            if (isNaN(primeiraHora) || isNaN(demaisHoras) || isNaN(diaria) || isNaN(mensal) || isNaN(tolerancia) || isNaN(meta)) {
                 alert("Por favor, preencha todos os campos com valores válidos.");
                 return;
             }
-
-            if (primeiraHora <= 0 || demaisHoras <= 0 || diaria <= 0 || mensal <= 0) {
-                alert("Os valores devem ser maiores que zero.");
+    
+            if (primeiraHora <= 0 || demaisHoras <= 0 || diaria <= 0 || mensal <= 0 || tolerancia < 0 || meta <= 0) {
+                alert("Os valores devem ser maiores que zero. O tempo de tolerância não pode ser negativo.");
                 return;
             }
-
+    
+            if (primeiraHora < demaisHoras) {
+                alert("O valor da primeira hora não pode ser menor que o valor das demais horas.");
+                return;
+            }
+    
             try {
-                // Salvar os valores no Firestore
                 await setDoc(doc(db, "Valores", "primeiraHora"), { valor: primeiraHora });
                 await setDoc(doc(db, "Valores", "demaisHoras"), { valor: demaisHoras });
                 await setDoc(doc(db, "Valores", "diaria"), { valor: diaria });
                 await setDoc(doc(db, "Valores", "mensal"), { valor: mensal });
-
+                await setDoc(doc(db, "Valores", "tolerancia"), { valor: tolerancia });
+                await setDoc(doc(db, "Valores", "metas"), { valor: meta });
+    
                 alert("Configurações salvas com sucesso!");
             } catch (error) {
-                console.error("Erro ao salvar as configurações:", error);
-                alert("Erro ao salvar as configurações.");
+                console.error("Erro ao salvar as configurações:", error.message);
+                alert("Erro ao salvar as configurações. Verifique suas permissões.");
             }
         });
+    
+        // Carregar os valores ao abrir a página
+        carregarValores();
 
-        // Logout
-        document.getElementById('logoutButton').addEventListener('click', () => {
-            history.back()
-        });
+        document.getElementById('logoutButton').addEventListener('click', function(){
+            history.back();
+        })
     </script>
+    
+    
 </body>
 </html>

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title>Dashboard em Tempo Real</title>
     <style>
         body {
@@ -10,43 +11,78 @@
             background-color: #f4f7f6;
             margin: 0;
             padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
         }
 
         .container {
-            width: 80%;
-            margin: auto;
-            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            width: 90%;
+            margin: 20px auto;
+            gap: 20px;
         }
 
         h1 {
             text-align: center;
             color: #333;
+            margin: 20px 0;
+        }
+
+        .graficos {
+            flex: 1;
+            min-width: 280px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
         }
 
         .dashboard {
             display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .card {
             background-color: #fff;
             padding: 20px;
-            margin: 10px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 30%;
             text-align: center;
         }
 
         .card h3 {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
         }
 
         .card p {
             font-size: 1.5rem;
             font-weight: bold;
             color: #333;
+        }
+
+        .graficos {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: auto;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        footer {
+            width: 100%;
+            text-align: center;
+            padding: 10px 0;
+            margin-top: auto;
+            background-color: #f4f7f6;
         }
 
         button {
@@ -63,18 +99,50 @@
             background-color: #218838;
         }
 
-        #logoutButton{
+        #logoutButton {
             background-color: rgb(207, 52, 52);
-            &:hover{
-                background-color: rgb(134, 33, 33);
+            margin: 10px auto;
+        }
+
+        #logoutButton:hover {
+            background-color: rgb(134, 33, 33);
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .dashboard {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .card h3 {
+                font-size: 1rem;
+            }
+
+            .card p {
+                font-size: 1.2rem;
+            }
+
+            button {
+                padding: 8px 16px;
+                font-size: 0.9rem;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Dashboard em Tempo Real</h1>
-        
+    <h1>Dashboard em Tempo Real</h1>
+    <div class="container">        
         <!-- Cards de Exibição -->
         <div class="dashboard">
             <div class="card">
@@ -90,15 +158,21 @@
                 <p id="totalValor">R$ 0,00</p>
             </div>
         </div>
-
-        <button id="logoutButton">Sair</button>
+        <!-- Gráfico -->
+        <div class="graficos">
+            <canvas id="progressoMeta"></canvas>
+        </div>
     </div>
-
+    <footer>
+        <button id="logoutButton">Sair</button>
+        <h3>Criado e desenvolvido por <a href="https://linktr.ee/017_us" target="_blank">Alexandre Miranda</a></h3>
+    </footer>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
-
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, where, onSnapshot, getDoc, doc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+    
         // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDTI6DPbna9um210NN8PQ653nCoqNgiIes",
@@ -108,11 +182,11 @@
             messagingSenderId: "431598769142",
             appId: "1:431598769142:web:825aed509188f8156e6dd7"
         };
-
+    
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-
+    
         // Verificar se o usuário está autenticado
         onAuthStateChanged(auth, (user) => {
             if (!user) {
@@ -120,49 +194,118 @@
                 window.location.href = "index.html";
             }
         });
-
-        // Função para atualizar a dashboard com os dados em tempo real
-        function atualizarDashboard() {
-            // Obter a data de hoje e preparar para filtrar
-            const hoje = new Date();
-            const startOfDay = new Date(hoje.setHours(0, 0, 0, 0)).getTime();  // Timestamp do início do dia
-            const endOfDay = new Date(hoje.setHours(23, 59, 59, 999)).getTime();  // Timestamp do final do dia
-
-            // Consultar a coleção 'entradas' e 'saidas' para atualizar os totais do dia
-            const entradasRef = collection(db, "entradas");
-            const saidasRef = collection(db, "saidas");
-
-            // Filtro de entradas para o dia atual
-            const entradasQuery = query(entradasRef, where("entrada", ">=", startOfDay), where("entrada", "<=", endOfDay));
-            onSnapshot(entradasQuery, (querySnapshot) => {
-                let totalEntradas = 0;
-                querySnapshot.forEach((doc) => {
-                    totalEntradas += 1;  // Somando o total de entradas
-                });
-                document.getElementById('totalEntradas').textContent = totalEntradas;
+    
+        // Buscar o valor da meta no Firestore
+        async function obterMetaDiaria() {
+            const metaRef = doc(db, "Valores", "metas");
+            const metaSnapshot = await getDoc(metaRef);
+    
+            if (metaSnapshot.exists()) {
+                return metaSnapshot.data().valor || 0; // Retorna o valor da meta ou 0 se não existir
+            } else {
+                console.error("Documento 'metas' não encontrado na coleção 'valores'.");
+                return 0;
+            }
+        }
+    
+        // Meta definida (buscando do Firestore)
+        let metaDiaria = 0;
+    
+        // Inicialização do gráfico
+        async function inicializarGrafico() {
+            metaDiaria = await obterMetaDiaria(); // Obter o valor da meta
+            console.log("Meta Diária:", metaDiaria);
+    
+            // Dados para o gráfico
+            let valoresAcumulados = [];
+            let labels = [];
+    
+            const ctx = document.getElementById('progressoMeta').getContext('2d');
+            const progressoChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Valor Acumulado (R$)',
+                            data: valoresAcumulados,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderWidth: 2,
+                        },
+                        {
+                            label: 'Meta (R$)',
+                            data: Array(24).fill(metaDiaria), // Traça a meta constante ao longo do dia
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderDash: [5, 5],
+                            fill: false,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Hora',
+                            },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)',
+                            },
+                        },
+                    },
+                },
             });
-
-            // Filtro de saídas para o dia atual
+    
+            // Atualização do gráfico com os dados do Firebase
+            const hoje = new Date();
+            const startOfDay = new Date(hoje.setHours(0, 0, 0, 0)).getTime();
+            const endOfDay = new Date(hoje.setHours(23, 59, 59, 999)).getTime();
+    
+            const saidasRef = collection(db, "saidas");
             const saidasQuery = query(saidasRef, where("saida", ">=", startOfDay), where("saida", "<=", endOfDay));
+    
             onSnapshot(saidasQuery, (querySnapshot) => {
-                let totalSaidas = 0;
                 let totalValor = 0;
+    
+                // Atualizar os valores acumulados e as labels
+                valoresAcumulados = [];
+                labels = [];
                 querySnapshot.forEach((doc) => {
-                    totalSaidas += 1;  // Somando o total de saídas
-                    totalValor += doc.data().valor || 0;  // Somando o valor
+                    const data = doc.data();
+                    const valor = data.valor || 0;
+                    const hora = new Date(data.saida).getHours();
+                    totalValor += valor;
+    
+                    // Atualizar gráfico
+                    if (!labels.includes(hora)) {
+                        labels.push(hora);
+                        valoresAcumulados.push(totalValor);
+                    } else {
+                        valoresAcumulados[labels.indexOf(hora)] = totalValor;
+                    }
                 });
-                document.getElementById('totalSaidas').textContent = totalSaidas;
-                document.getElementById('totalValor').textContent = `R$ ${totalValor.toFixed(2)}`;
+    
+                // Ordenar labels e sincronizar dados
+                labels.sort((a, b) => a - b);
+                progressoChart.data.labels = labels.map(h => `${h}:00`);
+                progressoChart.data.datasets[0].data = valoresAcumulados;
+                progressoChart.update();
             });
         }
+    
+        // Chamar a função para inicializar o gráfico
+        inicializarGrafico();
 
-        // Chama a função para atualizar a dashboard em tempo real
-        atualizarDashboard();
-
-         // Logout
-         document.getElementById('logoutButton').addEventListener('click', () => {
-            history.back()
-        });
+        document.getElementById('logoutButton').addEventListener('click', function(){
+            history.back();
+        })
     </script>
+    
 </body>
 </html>
